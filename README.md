@@ -13,6 +13,8 @@
  
 # Use Makefile   
   ```bash
+$ make down
+$ make build
 $ make up
 $ make install-recommend-packages 
 ```
