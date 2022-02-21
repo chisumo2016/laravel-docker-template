@@ -2,6 +2,7 @@
 
 ## Introduction
     Simple docker-compose template for laravel development environment.
+
         - Compatability with Laravel    
             - MacOS
             - Windows
