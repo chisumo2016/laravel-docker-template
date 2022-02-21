@@ -13,6 +13,7 @@
  
 # Use Makefile to run containers and other packages   
   ```bash
+$ make <name of command >
 $ make down
 $ make build
 $ make up
