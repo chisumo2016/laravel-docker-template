@@ -10,8 +10,10 @@
 ## Usage
     1. Git clone & change directory
     2. Execute the following command
-    
+ 
+# Use Makefile   
   ```bash
+$ make up
 $ make install-recommend-packages 
 ```
 ## Settings
