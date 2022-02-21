@@ -1,0 +1,152 @@
+version: '3.7'
+
+##MICROSERVICES##
+services:
+  nginx:
+    container_name: "${PROJECT_NAME}_nginx"
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    depends_on:
+      - app
+    volumes:
+      - ./:/var/www/html/${PROJECT_NAME}:cached
+      - ./docker/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    working_dir: /var/www/html/
+    restart: unless-stopped
+    tty: true
+    ports:
+      -  '80:80'
+    networks:
+      - crm
+    labels:
+      - 'traefik.http.routers.${PROJECT_NAME}_nginx.rule=HostRegexp(`${APP_DOMAIN}`, `{subdomain:[a-z]+.${APP_DOMAIN}}`)'
+      - 'traefik.http.routers.${PROJECT_NAME}_nginx.priority=1'
+      - 'traefik.docker.network=proxy'
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--connect-timeout", "1", "http://localhost:9008/api/ping"]
+      interval: 60s
+      timeout: 3s
+      retries: 3
+
+  app:
+    container_name: "${PROJECT_NAME}_php"
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    environment:
+      PHP_MEMORY_LIMIT: '512M'
+      COMPOSER_MEMORY_LIMIT: '-1' #never die
+    user: 501:501
+    volumes:
+      - ./:/var/www/html/${PROJECT_NAME}:cached
+    working_dir: /var/www/html/${PROJECT_NAME}
+    restart: unless-stopped
+    tty: true
+    ports:
+      - '9004:9003'
+    networks:
+      - crm
+
+  redis:
+    image: redis:latest
+    container_name: "${PROJECT_NAME}_redis"
+    ports:
+      - '6380:6379'
+    volumes:
+      - 'crm_redis:/data'
+    networks:
+      - crm
+
+  mysql:
+    image: mariadb:latest
+    container_name: "${PROJECT_NAME}_mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_USER: '${DB_USERNAME}'
+      MYSQL_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+      command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    tty: true
+    volumes:
+      - 'crm_mysql:/var/lib/mysql:rw'
+    ports:
+      - '4407:3306'
+    networks:
+      - crm
+
+  postgres:
+    image: postgres:12.3-alpine #postgres:latest
+    container_name: "${PROJECT_NAME}_postgres"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    restart: always
+    volumes:
+      - 'crm_postgres:/var/lib/postgresql/data'
+    ports:
+      - '5434:5432'
+    networks:
+      - crm
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    container_name: "${PROJECT_NAME}_phpmyadmin"
+    depends_on:
+      - mysql
+    ports:
+      - "8082:80"
+    environment:
+      PMA_HOST: '${APP_DOMAIN}'
+      PMA_PORT: '9004'
+      PMA_USER: '${DB_USERNAME}'
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+    volumes:
+      - 'crm_phpmyadmin:/data/db'
+    networks:
+      - crm
+
+  traefik:
+    image:    traefik:v2.0
+    container_name: "${PROJECT_NAME}_traefik"
+    restart: always
+    command:
+      - --entrypoints.web.address=:80
+      -   --providers.docker=true
+      -   --api.insecure=true
+      -   --log.level=debug
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.socket:ro'
+    ports:
+      - '84:80' #'80:80'
+      - '8090:8080'
+    networks:
+      - crm
+
+# NETWORKS
+networks:
+  crm:
+    driver: bridge
+
+# VOLUMES
+volumes:
+  crm_mysql:
+    driver: local
+
+  crm_phpmyadmin:
+    driver: local
+
+  crm_redis:
+    driver: local
+
+  crm_postgres:
+    driver: local
