@@ -11,7 +11,7 @@
     1. Git clone & change directory
     2. Execute the following command
  
-# Use Makefile   
+# Use Makefile to run containers and other packages   
   ```bash
 $ make down
 $ make build
